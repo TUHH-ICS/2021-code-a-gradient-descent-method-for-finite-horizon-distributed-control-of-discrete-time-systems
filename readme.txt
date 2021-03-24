@@ -1,4 +1,4 @@
-This folder contains the files to reproduce the results presented in
+This folder contains the files to reproduce the results and figures presented in
 
 S. Heinke and H. Werner, "A Gradient Descent Method for Finite Horizon 
 Distributed Control of Discrete Time Systems", submitted to the 60th 
