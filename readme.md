@@ -4,6 +4,8 @@ S. Heinke and H. Werner, "A Gradient Descent Method for Finite Horizon
 Distributed Control of Discrete Time Systems", submitted to the 60th 
 Conference on Decision and Control, 2021.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4633078.svg)](https://doi.org/10.5281/zenodo.4633078)
+
 The figures can be reproduced using the file 'generate_plots.m'. 
 The data for Figures 1 and 2 is generated using 'main_sf.m', the data 
 for Figure 3, 4 and 5 is generated using 'main_sf_comp.m', 'main_of.m' 
