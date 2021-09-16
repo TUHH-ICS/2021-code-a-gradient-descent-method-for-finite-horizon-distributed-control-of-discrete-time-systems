@@ -19,8 +19,37 @@ Sa=kron(S,ones(nx));
 
 Vi=0.1;
 for i=1:NoS
-    A=Sa.*randn(N*nx);
+   
     B=zeros(N*nx,N);
+    
+    flag=1;
+    % generate random sparsity patterns
+    while(flag)
+        St = rand(N) < 0.3; % a logical array consuming little memory
+        S = (tril(St)+tril(St)'+eye(N))>0;
+        G=graph(S);
+        bins = conncomp(G);
+        % check if graph is connected
+        if bins==ones(1,N)
+            flag=0;
+        else
+            flag=1;
+        end
+    end
+    Sa=kron(S,ones(nx));
+    
+    % number of neighbors
+    count_n=-ones(1,N);
+    for j=1:N
+        for k=1:N
+            if S(j,k)==1
+                count_n(j)=count_n(j)+1;
+            end
+        end
+    end
+    
+    A=Sa.*randn(N*nx);
+    
     for j=1:N
         B((j-1)*nx+1:j*nx,j)=[sign(-0.5+rand(1))*(0.1+rand(1)); zeros(nx-1,1)];
     end
@@ -38,13 +67,13 @@ for i=1:NoS
     D21=[zeros(N,nx*N) sqrt(Vi)*eye(N)];
     D22=zeros(N);
     
-    Pg=ss(A,[B1 B],[C1 ; C],[D11 D12; D21 D22],-1);
+    Pg=ss(A,[B1 B],[C1 ; C],[D11 D12; D21 D22],1);
     
     % h2syn:
     K1=h2syn(Pg,N,N);
     
-    % Algorithm 2:
-    alpha0=0.001;
+    % Algorithm 1:
+    alpha0=0.01;
     Nmax=2000; 
     Tmax=50;    
     Sp=kron(S,ones(nu,ny));
@@ -58,19 +87,45 @@ for i=1:NoS
     Ss=sparse(Sp);
     
     % static output feedback
-    K2=alg2_sof(As,Bs,Cs,Qs,QTs,Rs,Vi,alpha0,Nmax,Tmax,Ss);
+    K2=alg1_sof(As,Bs,Cs,Qs,QTs,Rs,Vi,alpha0,Nmax,Tmax,Ss);
     
     % dynmaic output feedback
     nkx=3;
-    K3=alg2_dof(As,Bs,Cs,Qs,QTs,Rs,Vi,alpha0,Nmax,Tmax,Ss,nkx);
+    K3=alg1_dof(As,Bs,Cs,Qs,QTs,Rs,Vi,alpha0,Nmax,Tmax,Ss,nkx);
 
-    % Algorithm 1:
+    % systune:
     % static output feedback
-    K4=alg1_sof(Pg,Sp);
+    K4=realp('K4',kron(S, zeros(nu,ny)));
+    K4.Free=kron(S, ones(nu,ny));
+    CL0=lft(Pg,K4);
+    CL0.InputName='in';
+    CL0.OutputName='out';
+    goal=TuningGoal.Variance('in','out',0.01);
+    [CL,fSoft] = systune(CL0,goal);
+    K4=CL.A.Blocks.K4.value;
     
     % dynamic output feedback
     nkx=3;
-    K5=alg1_dof(Pg,S,nkx);
+    AK=realp('AK',kron(S, 0.1*randn(nkx,nkx)));
+    AK.Free=kron(S, ones(nkx,nkx));
+    BK=realp('BK',kron(eye(N), 0.1*randn(nkx,ny)));
+    BK.Free=kron(eye(N), ones(nkx,ny));
+    CK=realp('CK',kron(S, 0.1*randn(nu,nkx)));
+    CK.Free=kron(S, ones(nu,nkx));
+    DK=realp('DK',kron(eye(N), 0.1*randn(nu,ny)));
+    DK.Free=kron(eye(N), ones(nu,ny));
+    K5=ss(AK,BK,CK,DK,1);
+    CL0=lft(Pg,K5);
+    CL0.InputName='in';
+    CL0.OutputName='out';
+    goal=TuningGoal.Variance('in','out',0.01);
+    [CL,fSoft] = systune(CL0,goal);
+    AK=CL.A.Blocks.AK.value;
+    BK=CL.A.Blocks.BK.value;
+    CK=CL.A.Blocks.CK.value;
+    DK=CL.A.Blocks.DK.value;
+    K5=ss(AK,BK,CK,DK,1);
+
     
     N1(i)=norm(lft(Pg,K1));
 
@@ -104,7 +159,7 @@ box on
 plot(100*x_,P1_,'b','LineWidth',1.5)
 plot(100*x_,P4_,'r-.','LineWidth',1.5)
 plot(100*x_,P2_,'b-.','LineWidth',1.5)
-legend('Alg. 1_S','Alg. 2_S','Alg. 1_D','Alg. 2_D')
+legend('systune_S','Alg. 1_S','systune_D','Alg. 1_D')
 xlabel('Fraction of systems [%]')
 
 ylabel('Centralized/ distribtuted')
